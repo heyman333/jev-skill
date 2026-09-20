@@ -1,6 +1,6 @@
 {
   "name": "jev-skill",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "좁은 판단을 LLM 대신 jev에게 넘겨 에이전트의 토큰을 아끼는 Claude Code / Codex 스킬. 의존성 0개.",
   "type": "module",
   "bin": {

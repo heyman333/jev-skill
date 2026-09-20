@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="338" viewBox="0 0 1120 338" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14">
+  <rect width="1120" height="338" rx="12" fill="#141A24"/>
+  <path d="M0 12a12 12 0 0 1 12-12h1096a12 12 0 0 1 12 12v24H0z" fill="#1E2632"/>
+  <line x1="0" y1="36" x2="1120" y2="36" stroke="#2A3444"/>
+  <circle cx="20" cy="18" r="5" fill="#FF5F57"/><circle cx="38" cy="18" r="5" fill="#FEBC2E"/><circle cx="56" cy="18" r="5" fill="#28C840"/>
+  <text x="560" y="23" fill="#697383" font-size="12" text-anchor="middle">jev — one call, three judgments</text>
+  <text xml:space="preserve" x="28" y="60"><tspan fill="#04CA81">$ </tspan><tspan fill="#E5E8EF">jev "결제가 3일째 실패하고 있어요. 환불도 안 되고요. 급합니다." \</tspan></text>
+  <text xml:space="preserve" x="28" y="86"><tspan fill="#697383">    --bool  urgent   "시간에 쫓기는 요청인가?" \</tspan></text>
+  <text xml:space="preserve" x="28" y="112"><tspan fill="#697383">    --pick  team     "어느 팀이 맡나?" billing=결제·환불 technical=버그·장애 sales=가격 \</tspan></text>
+  <text xml:space="preserve" x="28" y="138"><tspan fill="#697383">    --score severity "얼마나 심각한가?" 사소함 불편함 업무정지</tspan></text>
+  <text xml:space="preserve" x="28" y="164"></text>
+  <text xml:space="preserve" x="28" y="190"><tspan fill="#697383">urgent</tspan><tspan fill="#697383">         </tspan><tspan fill="#4DA3FF">예</tspan><tspan fill="#697383">  (96%)</tspan></text>
+  <text xml:space="preserve" x="28" y="216"><tspan fill="#697383">team</tspan><tspan fill="#697383">           </tspan><tspan fill="#4DA3FF">billing</tspan><tspan fill="#697383">  (100% · technical 0%, sales 0%)</tspan></text>
+  <text xml:space="preserve" x="28" y="242"><tspan fill="#697383">severity</tspan><tspan fill="#697383">       </tspan><tspan fill="#4DA3FF">1.53/2</tspan><tspan fill="#697383">  업무정지</tspan></text>
+  <text xml:space="preserve" x="28" y="268"><tspan fill="#FFAA33">               ⚠ severity 확신도가 낮습니다. 사람이 보는 게 낫습니다.</tspan></text>
+  <text xml:space="preserve" x="28" y="294"><tspan fill="#697383">               574ms · 입력 421 토큰</tspan></text>
+</svg>

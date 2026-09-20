@@ -1,52 +1,39 @@
-# 🎯 jev
+<img src="docs/hero.png" alt="" width="100%">
 
-**Stop burning LLM tokens on yes/no calls.**
+<h1 align="center">jev</h1>
+<p align="center"><b>Stop burning LLM tokens on yes/no calls.</b></p>
+<p align="center">
+  <a href="README.ko.md">한국어</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
 
-에이전트는 작업 중에 좁은 판단을 계속 내린다 — "이 파일이 관련 있나?",
-"이 테스트 실패가 진짜인가?", "이건 어느 카테고리인가?".
-그 하나하나가 LLM 호출이고, 토큰이고, 몇 초다.
+Your agent makes narrow judgments all day long — *is this file relevant? is this test
+failure a flake? which bucket does this go in?* Every one of those is an LLM call, tokens,
+and seconds.
 
-[jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)는 텍스트를 만들지 않고
-**타입이 고정된 값 + 캘리브레이션된 확신도**만 돌려준다. 건당 약 **$0.00004, 300~500ms**.
+[jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev) doesn't generate text.
+It returns a **typed value with a calibrated confidence**, in about **$0.00004 and 300–500ms**.
 
-```bash
-$ jev "결제가 3일째 실패하고 있어요. 급합니다." \
-    --bool  urgent   "시간에 쫓기는 요청인가?" \
-    --pick  team     "어느 팀이 맡나?" billing=결제·환불 technical=버그·장애 sales=가격 \
-    --score severity "얼마나 심각한가?" 사소함 불편함 업무정지
+<img src="docs/demo.svg" alt="jev answering three questions in one call" width="100%">
 
-urgent         예  (92%)
-team           technical  (85% · billing 8%, sales 7%)
-severity       1.60/2  업무정지
-               412ms · 입력 312 토큰
-```
+Three questions, **one call, one charge**.
 
-질문 3개를 물었지만 **호출은 한 번, 비용도 한 번**이다.
+## Why not just ask the LLM
 
-## What it includes
-
-| | |
-|---|---|
-| `skills/jev/SKILL.md` | 언제 넘기고 언제 넘기지 않는지. 스킬의 본체 |
-| `skills/jev/jev.mjs` | CLI 겸 라이브러리. **파일 하나, 의존성 0개** |
-
-스킬 디렉터리를 통째로 복사하면 그대로 돈다. 빌드도, `npm install` 도 없다.
-Node 20+ 의 내장 `fetch` 만 쓴다.
-
-### 왜 LLM 대신 jev인가
-
-| | LLM에게 시킬 때 | jev |
+| | Asking the LLM | jev |
 |---|---|---|
-| 응답 | 문장 ("아마 관련 있어 보입니다") | 타입이 고정된 값 + 확률 |
-| 확신도 | 없음. 항상 단언한다 | 캘리브레이션된 `confidence` |
-| 속도 | 2~10초 | 300~500ms |
-| 비용 | 판단이 작업보다 비쌀 수 있다 | $0.042 / 1M 입력 토큰, 출력 무료 |
-| 형식 | 파싱해야 한다. 가끔 깨진다 | 항상 같은 모양 |
+| Answer | Prose — *"this looks probably relevant"* | A typed value plus probabilities |
+| Confidence | None. It always sounds sure | Calibrated `confidence` |
+| Speed | 2–10s | 300–500ms |
+| Cost | The judgment can cost more than the work | $0.042 / 1M input tokens, output free |
+| Shape | You parse it. Sometimes it breaks | Always the same shape |
 
-파일 184개 중 인증 관련된 것만 찾아야 할 때:
+Need the auth-related files out of 184?
 
 ```bash
-git ls-files | jev --batch --bool relevant "이 파일이 인증 로직과 관련 있는가?"
+git ls-files | jev --batch --bool relevant "Is this file part of the auth logic?"
 ```
 
 ```json
@@ -54,102 +41,125 @@ git ls-files | jev --batch --bool relevant "이 파일이 인증 로직과 관�
 {"input":"README.md","relevant":false}
 ```
 
-에이전트는 12개만 읽으면 된다. 184개를 읽지도, 184번 LLM에게 묻지도 않는다.
+Your agent reads 12 files instead of 184 — and never had to guess.
+
+## Measured
+
+Not estimates. Both paths run through the same gateway, so the billing numbers come
+straight out of the responses. The script and the inputs are in [`bench/`](bench/) —
+re-run it yourself.
+
+**20 Korean support tickets → which team, and is it urgent.**
+
+| | Calls | Input tok | Output tok | Cost | Agreement |
+|---|---:|---:|---:|---:|---:|
+| **jev** | 20 | 7,961 | 1,100 | **$0.000334** | — |
+| `openai/gpt-5.2`, all 20 in one prompt | 1 | 457 | 166 | $0.003124 | 18/20 |
+
+**9.3× cheaper**, against the LLM's *best* case — one batched call, no per-item overhead.
+Per judgment jev came to **$0.0000167** and **~500ms**.
+
+jev spends **17× more tokens** and still costs a tenth as much: its input tokens are
+about **160× cheaper**, and its output is free. Sending each item separately, with the
+full question spec each time, is the cheap thing to do here.
+
+### What this doesn't show
+
+- **The batched LLM is faster in wall-clock time.** One call answered all 20 in ~2.1s.
+  If your items all fit in one prompt and you don't mind parsing the result, speed is
+  not the reason to reach for jev — cost, a fixed output shape, and calibrated
+  confidence are.
+- **Free-tier rate limits hit both.** Under sustained concurrency both jev and the chat
+  models returned 429. The benchmark runs sequentially so limits don't contaminate the
+  comparison.
+- **Neither side is ground truth.** 18/20 agreement means they differed on two tickets,
+  not that either was right.
+
+```bash
+AI_GATEWAY_API_KEY=... node bench/run.mjs openai/gpt-5.2 2
+```
+
+## What it includes
+
+| | |
+|---|---|
+| `skills/jev/SKILL.md` | When to delegate and when not to. This is the skill |
+| `skills/jev/jev.mjs` | CLI and library. **One file, zero dependencies** |
+
+Copy the skill directory anywhere and it works. No build step, no `npm install` —
+just Node 20+ and its built-in `fetch`.
 
 ## Install
 
-jev는 이식 가능한 [Agent Plugin](https://agent-plugins.org) 으로 배포된다 —
-`plugin.json` 하나, `skills/` 하나. Codex와 Claude Code가 같은 파일을 설치한다.
+jev ships as a portable [Agent Plugin](https://agent-plugins.org) — one `plugin.json`,
+one `skills/` directory. Codex and Claude Code install the same files.
 
-### 키 설정
+### Get a key
 
-**키가 먼저 필요하다.** 둘 중 **아무거나 하나**면 된다.
+Either one works. Both are plain HTTPS — neither adds a dependency.
 
-| | 발급처 | |
-|---|---|---|
-| `TYPESAFE_API_KEY` | [console.typesafe.ai/keys](https://console.typesafe.ai/keys) | TypeSafe 직접 호출 |
-| `AI_GATEWAY_API_KEY` | [vercel.com/ai-gateway](https://vercel.com/ai-gateway) | Vercel AI Gateway 경유. `vck_` 로 시작 |
+| | Where |
+|---|---|
+| `TYPESAFE_API_KEY` | [console.typesafe.ai/keys](https://console.typesafe.ai/keys) |
+| `AI_GATEWAY_API_KEY` | [vercel.com/ai-gateway](https://vercel.com/ai-gateway) — starts with `vck_` |
 
-둘 다 있으면 TypeSafe 직접 호출을 쓴다. **어느 쪽이든 npm 의존성은 없다** —
-엔드포인트와 응답 모양만 다르고, 그 차이는 스킬이 흡수한다.
+If you already have a Vercel account the second one is faster; AI Gateway serves jev on
+the free tier. With both set, jev calls TypeSafe directly.
 
-> 이미 Vercel 계정이 있다면 후자가 빠르다. AI Gateway는 무료 티어에서도 jev를 쓸 수 있다.
+#### Put it in `~/.zshenv`, not `~/.zshrc`
 
-#### 셸 설정 파일에 넣는다
-
-**`~/.zshrc` 가 아니라 `~/.zshenv` 다.** 여기서 대부분 막힌다.
+This is where most people get stuck.
 
 ```bash
 echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshenv
 ```
 
-zsh 는 파일마다 읽는 조건이 다르다.
+zsh reads each file under different conditions:
 
-| 파일 | 언제 읽히나 |
+| File | Read by |
 |---|---|
-| `~/.zshrc` | **대화형 셸만** — 사람이 직접 치는 터미널 |
-| `~/.zprofile` | 로그인 셸만 |
-| **`~/.zshenv`** | **모든 zsh** — 에이전트가 명령을 돌리는 비대화형 셸 포함 |
+| `~/.zshrc` | **Interactive shells only** — the terminal you type into |
+| `~/.zprofile` | Login shells only |
+| **`~/.zshenv`** | **Every zsh** — including the non-interactive shell your agent uses |
 
-에이전트는 명령을 **비대화형** 셸로 돌린다. `~/.zshrc` 에 넣으면 터미널에서는
-`echo $AI_GATEWAY_API_KEY` 가 값을 찍는데 에이전트는 계속 `API 키가 없습니다` 를 본다.
+Agents run commands in a **non-interactive** shell. Put the key in `~/.zshrc` and
+`echo $AI_GATEWAY_API_KEY` prints it in your terminal while the agent keeps reporting
+*"no API key"*.
 
-bash 를 쓴다면 `~/.bashrc` 에 넣되, 같은 증상이 나오면 `~/.profile` 에도 넣는다.
-`echo $SHELL` 로 어느 쪽인지 확인할 수 있다.
+On bash, use `~/.bashrc`, and add `~/.profile` too if the same symptom shows up.
 
-키가 셸 히스토리에 남는 게 싫으면 에디터로 직접 연다.
+#### Restart the agent
 
-```bash
-open -e ~/.zshenv      # macOS
-```
+A running process never sees an environment variable that changed after it started.
+The macOS desktop app does not quit when you close the window — **⌘Q**, then reopen.
 
-#### 에이전트를 재시작한다
-
-이미 실행 중인 Claude Code / Codex 는 나중에 바뀐 환경변수를 보지 못한다.
-macOS 데스크톱 앱은 창을 닫는 것만으로 꺼지지 않는다 — **⌘Q** 로 완전히 종료한 뒤 다시 연다.
-
-#### 확인
+#### Verify
 
 ```bash
-node ~/.claude/skills/jev/jev.mjs "결제가 3일째 안 돼요. 급해요." \
-  --bool urgent "시간에 쫓기는 요청인가?"
+jev --doctor
 ```
 
 ```text
-urgent         예  (96%)
-               412ms · 입력 118 토큰
+키          ✓ AI_GATEWAY_API_KEY (60자)
+백엔드      Vercel AI Gateway 경유
+연결        ✓ 588ms
 ```
 
-에이전트 안에서 확인하려면 그냥 물어보면 된다 — "jev 키 잡혔는지 확인해줘".
-
-> 키를 저장소에 커밋하지 마라. `.env` 는 이미 `.gitignore` 에 들어 있지만,
-> 셸 설정 파일에 두는 쪽이 더 안전하다.
-
 ### Codex
-
-플러그인으로 설치:
 
 ```bash
 codex plugin marketplace add heyman333/jev-skill
 ```
 
-그다음 플러그인 브라우저에서 `jev` 를 고른다:
-
-```text
-/plugins
-```
-
-손으로 넣어도 된다 — 디렉터리 하나라 빌드할 게 없다:
+Then pick `jev` in the plugin browser with `/plugins`. Or drop the directory in by hand:
 
 ```bash
-# 이 저장소만
-mkdir -p .agents/skills && cp -r skills/jev .agents/skills/
-
-# 모든 프로젝트
-mkdir -p ~/.agents/skills && cp -r skills/jev ~/.agents/skills/
+mkdir -p ~/.agents/skills && cp -r skills/jev ~/.agents/skills/     # every project
+mkdir -p .agents/skills && cp -r skills/jev .agents/skills/         # this repo only
 ```
 
-다음 세션부터 잡힌다. 분류나 필터링을 부탁하면 알아서 쓰고, 강제하려면 `$jev` 를 친다.
+Codex picks it up next session. Ask it to classify or filter something and it applies on
+its own; to force it, type `$jev`.
 
 ### Claude Code
 
@@ -158,215 +168,163 @@ mkdir -p ~/.agents/skills && cp -r skills/jev ~/.agents/skills/
 /plugin install jev@jev-skill
 ```
 
-#### 설치 범위 고르기
-
-기본은 **user** 범위다 — *내* 모든 프로젝트에 적용되고 저장소는 건드리지 않아서 팀원에게 영향이 없다.
-
-좁히거나 넓히려면 CLI에서 `--scope` 를 준다:
+The default scope is **user** — all of *your* projects, nothing written to the repo.
+Narrow or widen it with `--scope`:
 
 ```bash
-# 나만, 이 프로젝트만 (.claude/settings.local.json — 자동으로 gitignore 된다)
-claude plugin marketplace add heyman333/jev-skill --scope local
+# just me, just this project (.claude/settings.local.json — auto-gitignored)
 claude plugin install jev@jev-skill --scope local
 
-# 이 프로젝트의 팀 전체 (.claude/settings.json — 커밋한다)
-claude plugin marketplace add heyman333/jev-skill --scope project
+# the whole team on this project (.claude/settings.json — commit it)
 claude plugin install jev@jev-skill --scope project
 ```
 
-`project` 범위면 팀원이 pull 한 뒤 다음 세션에서 설치 안내를 받는다.
-`local` 범위면 설치한 것이 git에 전혀 나타나지 않는다.
-
-#### 업데이트
-
-새 버전은 이 마켓플레이스 저장소로 나간다. 마켓플레이스를 먼저 갱신한 뒤 플러그인을 올린다:
+Updating — refresh the marketplace first, then the plugin, then restart:
 
 ```text
 /plugin marketplace update jev-skill
 /plugin update jev@jev-skill
 ```
 
-CLI에서는 설치한 범위를 함께 준다:
+Or copy the skill by hand into `~/.claude/skills/` or `<project>/.claude/skills/`.
 
-```bash
-claude plugin marketplace update jev-skill
-claude plugin update jev@jev-skill --scope user   # 또는 local / project
-```
+### Cursor, Gemini CLI, anything else
 
-적용하려면 Claude Code를 다시 시작한다. 여러 범위에 설치했다면 각각 갱신해야 하고,
-프로젝트 안에서는 더 좁은 범위가 이긴다. `claude plugin list` 로 현재 상태를 본다.
-
-손으로 복사해도 된다:
-
-```bash
-# 이 프로젝트만
-cp -r skills/jev <your-project>/.claude/skills/
-
-# 모든 프로젝트
-cp -r skills/jev ~/.claude/skills/
-```
-
-### Cursor, Gemini CLI, 그 외
-
-스킬은 마크다운 하나와 Node 스크립트 하나다. 에이전트 전용 의존성이 없다.
-지시문 파일을 읽을 수 있는 에이전트라면 무엇이든 쓸 수 있다 — `AGENTS.md` 나
-`.cursor/rules` 에 `skills/jev/SKILL.md` 를 가리키기만 하면 된다.
+The skill is one Markdown file and one Node script with no agent-specific dependencies.
+Point your `AGENTS.md` or `.cursor/rules` at `skills/jev/SKILL.md` and it works.
 
 ## Usage
 
-설치했다면 에이전트가 알아서 쓴다.
+Once installed, your agent reaches for it on its own.
 
 ```text
-> 이 레포에서 인증 관련 파일만 골라줘
-> 실패한 테스트 중에 진짜 버그만 추려줘
-> 이 이슈들을 카테고리별로 분류해줘
+> pick out the auth-related files in this repo
+> of these failing tests, which are real bugs
+> sort these issues into buckets
 ```
 
-직접 부를 수도 있다:
+Or call it directly:
 
 ```
-jev "<판단 대상>" --bool  <id> "<질문>"
-jev "<대상>"     --pick  <id> "<질문>" <보기>[=설명] <보기>[=설명] ...
-jev "<대상>"     --score <id> "<질문>" <낮은단계> ... <높은단계>
-cat items.txt | jev --batch --bool <id> "<질문>"
+jev "<what to judge>" --bool  <id> "<question>"
+jev "<what to judge>" --pick  <id> "<question>" <option>[=description] ...
+jev "<what to judge>" --score <id> "<question>" <lowest> ... <highest>
+cat items.txt | jev --batch --bool <id> "<question>"
 ```
 
-| 옵션 | |
+| Flag | |
 |---|---|
-| `--batch` | stdin을 한 줄에 하나씩 읽어 같은 질문을 던진다. JSONL 출력, **입력 순서 유지** |
-| `--file <path>` | 판단 대상을 파일에서 읽는다 |
-| `--json` | 확률 분포까지 전부 JSON으로 |
-| `--quiet` | 값만 출력. 셸에 끼울 때 |
-| `--concurrency N` | 배치 동시 실행 수 (기본 8) |
+| `--batch` | One item per stdin line, same questions. JSONL out, **input order preserved** |
+| `--file <path>` | Read the subject from a file |
+| `--json` | Full response including probability distributions |
+| `--quiet` | Values only — for shell pipelines |
+| `--concurrency N` | Parallel batch requests (default 8) |
+| `--doctor` | Diagnose why the key isn't picked up. **Never prints the key** |
 
-배치에서 한 건이 실패해도 나머지는 살아남고, 그 줄만 `{"error":...}` 로 나온다.
+A failing item in a batch doesn't take the rest down; that line comes back as
+`{"error":...}`.
 
-셸 게이트로 쓰기:
+As a shell gate:
 
 ```bash
 if [ "$(jev "$(git log -1 --format=%B)" --quiet \
-        --bool ok "커밋 메시지가 무엇을 왜 바꿨는지 설명하는가?")" = "false" ]; then
-  echo "커밋 메시지를 다시 쓰세요"; exit 1
+        --bool ok "Does this commit message explain what changed and why?")" = "false" ]; then
+  echo "Rewrite the commit message"; exit 1
 fi
 ```
 
-## 질문 쓰는 법이 정확도를 결정한다
+## Question wording decides accuracy
 
-**jev는 틀리지 않는다.** 모호한 질문에는 모호한 답이 아니라 **확신에 찬 엉뚱한 답**이 돌아온다.
+**jev is never wrong.** Ask a vague question and you don't get a vague answer — you get a
+**confidently wrong** one.
 
-이 프로젝트를 만들며 실제로 당한 것 — "리뷰 10만 건을 분류" 작업의 난이도를 물었더니
-jev가 **1.55/2** 를 매겼다. 리뷰 한 건을 분류하는 건 사소한 일인데,
-**처리 건수를 난이도로 읽은 것**이다. 질문에 "**한 건** 기준으로, 전체 건수는 무시하라"를
-명시하자 **0.21** 로 교정됐다.
+A real one from building this. Asked how hard the task *"classify 100,000 reviews"* was,
+jev answered **1.55/2**. Classifying one review is trivial — it had read the **volume as
+difficulty**. Adding *"judge ONE item; ignore how many there are"* moved it to **0.21**.
 
-- 나쁨: `"이 작업은 어려운가?"`
-- 좋음: `"이 항목 하나를 처리하는 게 어려운가? 전체 건수는 무시하라."`
+- Bad: `"Is this task hard?"`
+- Good: `"Is handling ONE of these items hard? Ignore the total count."`
 
-보기에는 설명을 붙여라. `billing=결제·환불·인보이스` 가 `billing` 보다 정확하다.
+Describe your options. `billing=charges, refunds, invoices` beats `billing`.
 
-## 확신도가 낮으면 멈춘다
+## Low confidence stops the line
 
-`--pick` 과 `--score` 는 `confidence` 를 함께 준다. 60% 미만이면 경고가 찍힌다.
+`--pick` and `--score` return `confidence`. Under 60% the CLI says so.
 
-```
+```text
 team           billing  (71% · technical 14%, sales 14%)
                ⚠ team 확신도가 낮습니다. 사람이 보는 게 낫습니다.
 ```
 
-스킬은 이때 조용히 1순위로 진행하지 않는다. 사용자에게 후보를 보여주거나 그 항목만 직접 읽는다.
-**LLM은 확신이 없을 때도 단언한다.** jev는 그걸 숫자로 말해준다.
+The skill is told not to quietly take the top answer here — show the candidates or read
+that one item directly. **An LLM sounds certain even when it isn't.** jev hands you the number.
 
-## 문제 해결
+## Troubleshooting
 
-### 키가 안 잡힌다
+### The key isn't picked up
 
 ```bash
 jev --doctor
 ```
 
-어느 설정 파일에 키가 있는지 찾아 원인과 해결 명령까지 알려준다.
-**키 값은 출력하지 않는다** — 길이와 유무만 본다.
+It finds which config file holds the key and tells you the cause and the fix.
+**It never prints the key** — only its length and whether it's there.
 
-```text
-키          ✓ AI_GATEWAY_API_KEY (60자)
-백엔드      Vercel AI Gateway 경유
-연결        ✓ 588ms
-```
+> **Don't check with `echo $AI_GATEWAY_API_KEY`.** The value lands in your terminal and
+> your logs. `${VAR:-none}` is not masking either — if the variable is set, it prints the value.
 
-가장 흔한 경우는 이것이다.
+### It works in my terminal but not in the agent
 
-```text
-키          ✗ 이 셸에 없습니다
-설정 파일   ~/.zshrc 에 있음
+The key is in `~/.zshrc`. Agents use a non-interactive shell, which doesn't read that file.
+Move it to `~/.zshenv`. If other `~/.zshrc` variables (`NVM_DIR`, say) are also missing,
+that confirms it.
 
-  원인을 찾았습니다. ~/.zshenv 에 없습니다.
-```
+### I updated the plugin but the old behavior persists
 
-> **`echo $AI_GATEWAY_API_KEY` 로 확인하지 마라.** 값이 그대로 터미널과 로그에 남는다.
-> `${VAR:-없음}` 같은 구문도 마스킹이 아니다 — 값이 있으면 그 값을 찍는다.
-
-### 터미널에서는 되는데 에이전트만 안 된다
-
-`~/.zshrc` 에 넣은 것이다. 에이전트는 비대화형 셸이라 그 파일을 읽지 않는다.
-`~/.zshenv` 로 옮긴다. 다른 `~/.zshrc` 변수(`NVM_DIR` 등)도 함께 안 보이면 확진이다.
-
-### 플러그인을 업데이트했는데 옛 동작 그대로다
-
-플러그인 캐시는 자동으로 갱신되지 않는다. 마켓플레이스를 먼저 새로 고친다.
-
-```text
-/plugin marketplace update jev-skill
-/plugin update jev@jev-skill
-```
-
-그다음 에이전트를 재시작한다. 설치본이 최신인지는 이렇게 본다.
+The plugin cache doesn't refresh on its own. Update the marketplace first, then the
+plugin, then restart the agent.
 
 ```bash
 grep -c zshenv ~/.claude/plugins/cache/jev-skill/jev/*/skills/jev/jev.mjs
 ```
 
-### 확신도 경고가 계속 뜬다
+### The low-confidence warning keeps firing
 
-질문이 모호한 것이다. 보기에 설명을 붙이고(`billing=결제·환불·인보이스`),
-여러 건을 처리할 때는 "한 건 기준으로" 를 명시한다. 위 [질문 쓰는 법](#질문-쓰는-법이-정확도를-결정한다) 참고.
+The question is ambiguous. Describe your options
+(`billing=charges, refunds, invoices`) and say *"judge ONE item"* for batch work.
+See [Question wording decides accuracy](#question-wording-decides-accuracy).
 
-## 한계
+## Limits
 
-- **만들지 못한다.** 코드를 고치거나 글을 쓰는 일은 여전히 LLM의 몫이다. jev는 판단만 한다.
-- **설명하지 못한다.** "왜 그렇게 판단했나"에 답하지 못한다. 확률만 준다.
-- **텍스트 밖은 못 본다.** 파일을 읽거나 명령을 실행해야 아는 것은 먼저 읽어서 넘겨야 한다.
-- **한 건짜리는 손해다.** 호출 왕복이 아깝다. 반복될수록 이득이 커진다.
+- **It can't make anything.** Writing code or prose is still the LLM's job. jev only judges.
+- **It can't explain itself.** No *"why did you decide that"* — just probabilities.
+- **It can't see past the text you hand it.** Read the file first, then pass the content.
+- **One-offs aren't worth it.** The round trip costs more than the judgment saves.
 
 ## Repo layout
 
 ```text
-plugin.json                  # 이식 가능한 매니페스트 (Agent Plugins 1.0) — 기준
-.codex-plugin/               # Codex 호환 매니페스트
-.claude-plugin/              # Claude Code 매니페스트 + 마켓플레이스 카탈로그
-.agents/plugins/             # Codex 마켓플레이스 카탈로그
-.agents/skills/jev -> ../../skills/jev    # 복사본이 아니라 심볼릭 링크
-skills/jev/                  # 스킬 본체 — SKILL.md, jev.mjs
-scripts/check-manifests.mjs  # 매니페스트 6개의 이름·버전이 같은지 검사
+plugin.json                  # portable manifest (Agent Plugins 1.0) — the source of truth
+.codex-plugin/               # Codex manifest
+.claude-plugin/              # Claude Code manifest + marketplace catalog
+.agents/plugins/             # Codex marketplace catalog
+.agents/skills/jev -> ../../skills/jev    # a symlink, not a copy
+skills/jev/                  # the skill — SKILL.md, jev.mjs
+scripts/check-manifests.mjs  # six manifests, one name and one version
+scripts/build-demo-svg.mjs   # docs/demo.svg is generated from real CLI output
+bench/                       # the head-to-head benchmark behind the Measured section
 ```
 
-두 런타임이 같은 `skills/` 를 읽는다. 에이전트별로 스킬을 포크하지 않는다 —
-`.agents/skills/jev` 가 심볼릭 링크인 것은 의도다.
+Both runtimes load the same `skills/`. The skill is never forked per agent.
 
-## 개발
+## Development
 
 ```bash
-npm test      # 목 서버로 실제 HTTP 를 태운다. 의존성 없음
-npm run check # 매니페스트 6개의 이름·버전 일치
+npm test      # spawns a mock server and drives the CLI over real HTTP. No dependencies
+npm run check # manifest name and version agreement
 ```
 
-버전을 올릴 때는 여섯 파일을 모두 고쳐야 한다 — `package.json`, `plugin.json`,
-`.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`,
-`.claude-plugin/marketplace.json`. `npm run check` 가 갈라짐을 잡는다.
-
-## 관련 프로젝트
-
-[jev-model-classifier](https://github.com/heyman333/jev-model-classifier) —
-같은 아이디어를 모델 선택에 적용한 웹 버전.
+Bumping the version means editing five files. `npm run check` catches any drift.
 
 ## License
 
