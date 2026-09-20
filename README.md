@@ -75,18 +75,10 @@ jev는 이식 가능한 [Agent Plugin](https://agent-plugins.org) 으로 배포�
 
 > 이미 Vercel 계정이 있다면 후자가 빠르다. AI Gateway는 무료 티어에서도 jev를 쓸 수 있다.
 
-#### 잠깐 써보기
+#### 셸 설정 파일에 넣는다
 
-터미널에 그대로 치면 된다. **단 그 창에서만, 창을 닫을 때까지만** 유효하다.
-
-```bash
-export AI_GATEWAY_API_KEY="vck_..."   # 또는 TYPESAFE_API_KEY
-```
-
-#### 계속 쓰기
-
-셸 설정 파일에 넣어야 창을 닫아도 남는다. macOS 기본은 zsh 라 `~/.zshrc`,
-bash 를 쓰면 `~/.bashrc` 다. `echo $SHELL` 로 확인할 수 있다.
+macOS 기본은 zsh 라 `~/.zshrc`, bash 를 쓰면 `~/.bashrc` 다.
+`echo $SHELL` 로 확인할 수 있다.
 
 ```bash
 echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshrc && source ~/.zshrc
