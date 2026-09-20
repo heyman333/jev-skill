@@ -182,4 +182,21 @@ for (const mode of ['typesafe', 'gateway']) {
   await new Promise((r) => mock.once('close', r));
 }
 
+// --- 키 안내가 세 곳에 흩어져 있다 ------------------------------------
+// README · SKILL.md · CLI 오류 메시지. "재시작" 을 빠뜨리면 사용자가
+// 키를 제대로 넣고도 같은 오류를 계속 본다. 실제로 가장 자주 걸리는 지점이라
+// 세 곳 모두에 남아 있는지 검사한다.
+{
+  const readme = readFileSync('README.md', 'utf8');
+  const skill = readFileSync('skills/jev/SKILL.md', 'utf8');
+  const code = readFileSync('skills/jev/jev.mjs', 'utf8');
+
+  for (const [name, text] of [['README.md', readme], ['SKILL.md', skill], ['jev.mjs', code]]) {
+    assert.ok(text.includes('TYPESAFE_API_KEY'), `${name} 에 TYPESAFE_API_KEY 안내가 없다`);
+    assert.ok(text.includes('AI_GATEWAY_API_KEY'), `${name} 에 AI_GATEWAY_API_KEY 안내가 없다`);
+    assert.match(text, /재시작|껐다 켜/, `${name} 에 에이전트 재시작 안내가 없다`);
+    assert.ok(text.includes('.zshrc'), `${name} 에 셸 설정 파일 안내가 없다`);
+  }
+}
+
 console.log('ok');

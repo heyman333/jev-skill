@@ -121,12 +121,34 @@ team           billing  (71% · technical 14%, sales 14%)
 
 ## 키 설정
 
+키가 없으면 CLI 가 `API 키가 없습니다` 로 실패한다.
+그때는 **추측으로 판단을 대신하지 않고** 아래를 사용자에게 안내한다.
+
 둘 중 **아무거나 하나**면 된다.
 
-```bash
-export TYPESAFE_API_KEY="..."        # https://console.typesafe.ai/keys
-export AI_GATEWAY_API_KEY="vck_..."  # https://vercel.com/ai-gateway
-```
+| | 발급처 |
+|---|---|
+| `TYPESAFE_API_KEY` | https://console.typesafe.ai/keys |
+| `AI_GATEWAY_API_KEY` | https://vercel.com/ai-gateway (`vck_` 로 시작) |
 
-키가 없으면 CLI가 실패한다. 그때는 이 안내를 사용자에게 전달하고,
-**추측으로 판단을 대신하지 않는다.**
+설정은 두 단계다. **둘째 단계를 빠뜨리는 경우가 많으니 함께 안내한다.**
+
+1. 셸 설정 파일에 넣는다. macOS 기본은 zsh 라 `~/.zshrc`, bash 면 `~/.bashrc`.
+
+   ```bash
+   echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshrc && source ~/.zshrc
+   ```
+
+   터미널에 `export` 만 치면 **그 창에서만, 닫을 때까지만** 유효하다.
+   한 번 시험해 볼 때는 그걸로 충분하지만 계속 쓰려면 파일에 넣어야 한다.
+
+2. **에이전트를 재시작한다.** 이미 떠 있는 프로세스는 나중에 바뀐 환경변수를
+   보지 못한다. 이 단계를 건너뛰면 키를 제대로 넣고도 계속 같은 오류가 난다.
+
+사용자가 "키 넣었는데 안 된다"고 하면 이 순서로 확인한다.
+
+- `echo $AI_GATEWAY_API_KEY` 가 값을 찍는가 → 안 찍히면 1번을 다시
+- 터미널에서는 찍히는데 에이전트만 실패하는가 → 재시작했는지 확인,
+  그래도 안 되면 `~/.zprofile` 에도 같은 줄을 넣게 한다 (로그인 셸이 먼저 읽는다)
+
+키 값을 사용자에게 채팅으로 붙여넣으라고 하지 않는다. 대화 기록에 남는다.

@@ -27,7 +27,19 @@ export function backend() {
   if (gateway) return { kind: 'gateway', key: gateway };
 
   throw new JevError('API 키가 없습니다.', {
-    hint: 'TYPESAFE_API_KEY (https://console.typesafe.ai/keys) 또는\n  AI_GATEWAY_API_KEY (https://vercel.com/ai-gateway) 중 하나를 설정하세요.',
+    hint: [
+      '둘 중 하나를 설정하세요.',
+      '',
+      '    TYPESAFE_API_KEY      https://console.typesafe.ai/keys',
+      '    AI_GATEWAY_API_KEY    https://vercel.com/ai-gateway  (vck_ 로 시작)',
+      '',
+      '창을 닫아도 남게 하려면 셸 설정 파일에 넣습니다.',
+      '',
+      "    echo 'export AI_GATEWAY_API_KEY=\"...\"' >> ~/.zshrc && source ~/.zshrc",
+      '',
+      '이미 실행 중인 에이전트는 나중에 바뀐 환경변수를 보지 못합니다.',
+      '키를 넣었다면 에이전트를 껐다 켜세요.',
+    ].join('\n  '),
   });
 }
 

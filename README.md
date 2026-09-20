@@ -61,20 +61,67 @@ git ls-files | jev --batch --bool relevant "이 파일이 인증 로직과 관�
 jev는 이식 가능한 [Agent Plugin](https://agent-plugins.org) 으로 배포된다 —
 `plugin.json` 하나, `skills/` 하나. Codex와 Claude Code가 같은 파일을 설치한다.
 
+### 키 설정
+
 **키가 먼저 필요하다.** 둘 중 **아무거나 하나**면 된다.
 
-```bash
-# A. TypeSafe 콘솔 키 — https://console.typesafe.ai/keys
-export TYPESAFE_API_KEY="..."
-
-# B. Vercel AI Gateway 키 — https://vercel.com/ai-gateway (vck_ 로 시작)
-export AI_GATEWAY_API_KEY="vck_..."
-```
+| | 발급처 | |
+|---|---|---|
+| `TYPESAFE_API_KEY` | [console.typesafe.ai/keys](https://console.typesafe.ai/keys) | TypeSafe 직접 호출 |
+| `AI_GATEWAY_API_KEY` | [vercel.com/ai-gateway](https://vercel.com/ai-gateway) | Vercel AI Gateway 경유. `vck_` 로 시작 |
 
 둘 다 있으면 TypeSafe 직접 호출을 쓴다. **어느 쪽이든 npm 의존성은 없다** —
 엔드포인트와 응답 모양만 다르고, 그 차이는 스킬이 흡수한다.
 
-> 이미 Vercel 계정이 있다면 B가 빠르다. AI Gateway는 무료 티어에서도 jev를 쓸 수 있다.
+> 이미 Vercel 계정이 있다면 후자가 빠르다. AI Gateway는 무료 티어에서도 jev를 쓸 수 있다.
+
+#### 잠깐 써보기
+
+터미널에 그대로 치면 된다. **단 그 창에서만, 창을 닫을 때까지만** 유효하다.
+
+```bash
+export AI_GATEWAY_API_KEY="vck_..."   # 또는 TYPESAFE_API_KEY
+```
+
+#### 계속 쓰기
+
+셸 설정 파일에 넣어야 창을 닫아도 남는다. macOS 기본은 zsh 라 `~/.zshrc`,
+bash 를 쓰면 `~/.bashrc` 다. `echo $SHELL` 로 확인할 수 있다.
+
+```bash
+echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshrc && source ~/.zshrc
+```
+
+키가 셸 히스토리에 남는 게 싫으면 에디터로 직접 연다.
+
+```bash
+open -e ~/.zshrc      # macOS
+```
+
+#### 에이전트를 재시작한다
+
+**이게 제일 자주 걸리는 지점이다.** 이미 실행 중인 Claude Code / Codex 는
+나중에 바뀐 환경변수를 보지 못한다. 키를 넣었으면 에이전트를 껐다 켜야 한다.
+
+확인:
+
+```bash
+echo $AI_GATEWAY_API_KEY          # 값이 찍히는지
+node ~/.claude/skills/jev/jev.mjs "결제가 3일째 안 돼요. 급해요." \
+  --bool urgent "시간에 쫓기는 요청인가?"
+```
+
+```text
+urgent         예  (96%)
+               412ms · 입력 118 토큰
+```
+
+터미널에서는 보이는데 에이전트에서만 `API 키가 없습니다` 가 나오면,
+그 에이전트가 로그인 셸을 거치지 않은 것이다. `~/.zprofile` 에도 같은 줄을 넣어본다 —
+로그인 셸은 그쪽을 먼저 읽는다.
+
+> 키를 저장소에 커밋하지 마라. `.env` 는 이미 `.gitignore` 에 들어 있지만,
+> 셸 설정 파일에 두는 쪽이 더 안전하다.
 
 ### Codex
 
