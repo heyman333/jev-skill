@@ -1,12 +1,23 @@
 {
   "name": "jev",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "좁은 판단(예/아니오·분류·0~N 점수)을 LLM 대신 jev 에게 넘겨 에이전트의 토큰과 시간을 아끼는 스킬. 타입이 고정된 확률과 캘리브레이션된 확신도를 건당 약 $0.00004, 300~500ms 에 돌려준다.",
-  "author": { "name": "heyman333", "url": "https://github.com/heyman333" },
+  "author": {
+    "name": "heyman333",
+    "url": "https://github.com/heyman333"
+  },
   "homepage": "https://github.com/heyman333/jev-skill",
   "repository": "https://github.com/heyman333/jev-skill",
   "license": "MIT",
-  "keywords": ["jev", "typesafe", "classification", "token-saving", "agent", "routing", "triage"],
+  "keywords": [
+    "jev",
+    "typesafe",
+    "classification",
+    "token-saving",
+    "agent",
+    "routing",
+    "triage"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "jev",
@@ -14,7 +25,9 @@
     "longDescription": "Agents burn LLM calls on narrow judgments — is this file relevant, is this failure a flake, which bucket is this. jev answers those with a typed value and a calibrated confidence instead of prose, at about $0.00004 and 300-500ms per call. Ask several questions in one call; batch many items through stdin.",
     "developerName": "heyman333",
     "category": "Productivity",
-    "capabilities": ["Bash"],
+    "capabilities": [
+      "Bash"
+    ],
     "websiteURL": "https://github.com/heyman333/jev-skill",
     "defaultPrompt": [
       "이 레포에서 인증 관련 파일만 골라줘",

@@ -243,6 +243,80 @@ function need(v, msg) {
   return v;
 }
 
+/**
+ * 왜 안 되는지 기계로 짚는다.
+ *
+ * 이 스킬에서 가장 많은 시간을 잡아먹은 게 "터미널에서는 echo 가 값을 찍는데
+ * 에이전트만 키를 못 본다" 였다. 원인은 zsh 설정 파일 규칙이고 눈으로는 안 보인다.
+ * 사람이 손으로 진단하다 키를 그대로 출력하는 사고까지 났다. 그래서 기계화했다.
+ *
+ * 키 값은 어떤 경우에도 출력하지 않는다. 길이와 유무만 본다.
+ */
+export async function doctor() {
+  const { homedir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { readFile } = await import('node:fs/promises');
+  const lines = [];
+  // 한글은 터미널에서 두 칸을 차지한다. padEnd 는 그걸 모른다.
+  const width = (t) => [...t].reduce((n, c) => n + (c.codePointAt(0) > 0x1100 ? 2 : 1), 0);
+  const row = (k, v) => lines.push(k + ' '.repeat(Math.max(1, 12 - width(k))) + v);
+  let ok = true;
+
+  const names = ['TYPESAFE_API_KEY', 'AI_GATEWAY_API_KEY'];
+  const present = names.filter((n) => process.env[n]?.trim());
+
+  if (present.length) {
+    for (const n of present) row('키', `✓ ${n} (${process.env[n].trim().length}자)`);
+    row('백엔드', backend().kind === 'typesafe' ? 'api.typesafe.ai 직접' : 'Vercel AI Gateway 경유');
+  } else {
+    ok = false;
+    row('키', '✗ 이 셸에 없습니다');
+
+    // ~/.zshrc 에만 있는 경우가 압도적으로 많다. 그게 이 문제의 정체다.
+    const where = [];
+    for (const rc of ['.zshenv', '.zshrc', '.zprofile', '.bashrc', '.profile']) {
+      const text = await readFile(join(homedir(), rc), 'utf8').catch(() => '');
+      if (names.some((n) => text.includes(n))) where.push('~/' + rc);
+    }
+    row('설정 파일', where.length ? where.join(', ') + ' 에 있음' : '어느 파일에도 없음');
+
+    if (where.length && !where.includes('~/.zshenv')) {
+      lines.push('');
+      lines.push('  원인을 찾았습니다. ~/.zshenv 에 없습니다.');
+      lines.push('  ~/.zshrc 와 ~/.zprofile 은 각각 대화형·로그인 셸만 읽습니다.');
+      lines.push('  에이전트는 비대화형 셸로 명령을 돌리므로 ~/.zshenv 여야 합니다.');
+      lines.push('');
+      lines.push('    echo \'export AI_GATEWAY_API_KEY="..."\' >> ~/.zshenv');
+      lines.push('');
+      lines.push('  그다음 에이전트를 재시작하세요 (데스크톱 앱은 ⌘Q 로 완전 종료).');
+    } else if (!where.length) {
+      lines.push('');
+      lines.push('  키를 발급해 ~/.zshenv 에 넣으세요.');
+      lines.push('    TYPESAFE_API_KEY      https://console.typesafe.ai/keys');
+      lines.push('    AI_GATEWAY_API_KEY    https://vercel.com/ai-gateway');
+    } else {
+      lines.push('');
+      lines.push('  ~/.zshenv 에는 있는데 이 셸에서 안 보입니다.');
+      lines.push('  에이전트를 재시작하세요 (데스크톱 앱은 ⌘Q 로 완전 종료).');
+    }
+  }
+
+  if (ok) {
+    const started = Date.now();
+    try {
+      await ask('ping', { ok: { type: 'noul', instructions: 'Is this text in English?' } });
+      row('연결', `✓ ${Date.now() - started}ms`);
+    } catch (e) {
+      ok = false;
+      row('연결', `✗ ${e.message}`);
+      if (e.hint) lines.push('', '  ' + e.hint.split('\n')[0]);
+    }
+  }
+
+  out(lines.join('\n'));
+  if (!ok) process.exitCode = 1;
+}
+
 // ---------------------------------------------------------------- CLI
 
 const HELP = `jev — LLM 대신 좁은 판단을 시킵니다. 건당 약 $0.00004, 300~500ms.
@@ -265,6 +339,7 @@ const HELP = `jev — LLM 대신 좁은 판단을 시킵니다. 건당 약 $0.00
   --json           전체 응답을 JSON 으로
   --quiet          값만 출력 (셸에서 쓰기 좋음)
   --concurrency N  --batch 동시 실행 수 (기본 8)
+  --doctor         키가 왜 안 잡히는지 진단합니다 (키 값은 출력하지 않습니다)
   -h, --help
 
 환경변수
@@ -273,6 +348,7 @@ const HELP = `jev — LLM 대신 좁은 판단을 시킵니다. 건당 약 $0.00
 
 export async function cli(argv) {
   if (!argv.length || argv.includes('-h') || argv.includes('--help')) return out(HELP);
+  if (argv.includes('--doctor')) return doctor();
 
   const { questions, rest } = parseQuestions(argv);
   const opt = { batch: false, json: false, quiet: false, file: null, concurrency: 8 };

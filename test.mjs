@@ -182,6 +182,54 @@ for (const mode of ['typesafe', 'gateway']) {
   await new Promise((r) => mock.once('close', r));
 }
 
+// --- --doctor ----------------------------------------------------------
+// 키가 안 잡히는 이유를 손으로 짚다가 키를 그대로 출력하는 사고가 났다.
+// doctor 는 어떤 경우에도 값을 찍지 않고, 네 가지 상황을 구분해야 한다.
+{
+  const { mkdtempSync, writeFileSync: wf, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+
+  const runDoctor = (home, env = {}) => new Promise((resolve) => {
+    const p = spawn(process.execPath, [SKILL, '--doctor'], {
+      env: { ...process.env, HOME: home, TYPESAFE_API_KEY: '', AI_GATEWAY_API_KEY: '', ...env },
+    });
+    let o = ''; p.stdout.on('data', (d) => (o += d));
+    p.on('close', (code) => resolve({ o, code }));
+  });
+
+  const home = mkdtempSync(join(tmpdir(), 'jev-'));
+
+  // 아무 데도 없을 때
+  let r = await runDoctor(home);
+  assert.equal(r.code, 1);
+  assert.match(r.o, /어느 파일에도 없음/);
+
+  // ~/.zshrc 에만 있을 때 — 이게 이 스킬에서 가장 많은 시간을 잡아먹은 상황이다
+  wf(join(home, '.zshrc'), 'export AI_GATEWAY_API_KEY="SECRET-VALUE"\n');
+  r = await runDoctor(home);
+  assert.equal(r.code, 1);
+  assert.match(r.o, /~\/\.zshenv 에 없습니다/, '.zshrc 에만 있는 경우를 못 짚는다');
+  assert.match(r.o, /비대화형/, '이유를 설명하지 않는다');
+
+  // ~/.zshenv 에 있는데 셸에 안 보일 때 = 재시작 안 함
+  wf(join(home, '.zshenv'), 'export AI_GATEWAY_API_KEY="SECRET-VALUE"\n');
+  r = await runDoctor(home);
+  assert.equal(r.code, 1);
+  assert.match(r.o, /재시작/, '재시작 안내가 없다');
+
+  // 어떤 상황에서도 키 값을 출력하지 않는다
+  for (const home2 of [home]) {
+    const out = (await runDoctor(home2)).o;
+    assert.ok(!out.includes('SECRET-VALUE'), 'doctor 가 키 값을 출력했다');
+  }
+  const withKey = await runDoctor(home, { AI_GATEWAY_API_KEY: 'SECRET-VALUE', JEV_ENDPOINT: 'http://127.0.0.1:1' });
+  assert.ok(!withKey.o.includes('SECRET-VALUE'), 'doctor 가 환경변수의 키 값을 출력했다');
+  assert.match(withKey.o, /12자/, '길이는 보여줘야 한다');
+
+  rmSync(home, { recursive: true, force: true });
+}
+
 // --- 키 안내가 세 곳에 흩어져 있다 ------------------------------------
 // README · SKILL.md · CLI 오류 메시지. "재시작" 을 빠뜨리면 사용자가
 // 키를 제대로 넣고도 같은 오류를 계속 본다. 실제로 가장 자주 걸리는 지점이라
