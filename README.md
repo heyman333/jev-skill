@@ -61,15 +61,20 @@ git ls-files | jev --batch --bool relevant "이 파일이 인증 로직과 관�
 jev는 이식 가능한 [Agent Plugin](https://agent-plugins.org) 으로 배포된다 —
 `plugin.json` 하나, `skills/` 하나. Codex와 Claude Code가 같은 파일을 설치한다.
 
-**키가 먼저 필요하다.** [console.typesafe.ai/keys](https://console.typesafe.ai/keys) 에서 발급한 뒤
-셸 설정(`~/.zshrc` 또는 `~/.bashrc`)에 넣는다.
+**키가 먼저 필요하다.** 둘 중 **아무거나 하나**면 된다.
 
 ```bash
-export TYPESAFE_API_KEY="여기에-키"
+# A. TypeSafe 콘솔 키 — https://console.typesafe.ai/keys
+export TYPESAFE_API_KEY="..."
+
+# B. Vercel AI Gateway 키 — https://vercel.com/ai-gateway (vck_ 로 시작)
+export AI_GATEWAY_API_KEY="vck_..."
 ```
 
-> Vercel AI Gateway의 `vck_` 키는 동작하지 않는다. 발급처가 다르다.
-> 잘못 넣으면 401이 나고 CLI가 그 사실을 알려준다.
+둘 다 있으면 TypeSafe 직접 호출을 쓴다. **어느 쪽이든 npm 의존성은 없다** —
+엔드포인트와 응답 모양만 다르고, 그 차이는 스킬이 흡수한다.
+
+> 이미 Vercel 계정이 있다면 B가 빠르다. AI Gateway는 무료 티어에서도 jev를 쓸 수 있다.
 
 ### Codex
 

@@ -121,9 +121,12 @@ team           billing  (71% · technical 14%, sales 14%)
 
 ## 키 설정
 
+둘 중 **아무거나 하나**면 된다.
+
 ```bash
-export TYPESAFE_API_KEY="..."   # https://console.typesafe.ai/keys
+export TYPESAFE_API_KEY="..."        # https://console.typesafe.ai/keys
+export AI_GATEWAY_API_KEY="vck_..."  # https://vercel.com/ai-gateway
 ```
 
 키가 없으면 CLI가 실패한다. 그때는 이 안내를 사용자에게 전달하고,
-**추측으로 판단을 대신하지 않는다.** Vercel AI Gateway의 `vck_` 키는 동작하지 않는다.
+**추측으로 판단을 대신하지 않는다.**

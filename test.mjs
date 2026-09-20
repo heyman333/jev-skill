@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { simplify, askMany, ask, parseQuestions, JevError } from './skills/jev/jev.mjs';
+import { simplify, askMany, ask, parseQuestions, backend, JevError } from './skills/jev/jev.mjs';
 import { checkManifests } from './scripts/check-manifests.mjs';
 
 const SKILL = 'skills/jev/jev.mjs';
@@ -78,19 +78,71 @@ assert.deepEqual(simplify({}).answers, {});
   delete process.env.JEV_ENDPOINT;
 }
 await assert.rejects(ask('x', {}), (e) => e instanceof JevError && /질문이 없습니다/.test(e.message));
+
+// --- 키 두 종류 ---------------------------------------------------------
 {
-  const saved = process.env.TYPESAFE_API_KEY;
-  delete process.env.TYPESAFE_API_KEY;
-  await assert.rejects(ask('x', { q: { type: 'noul', instructions: 'q' } }),
-    (e) => e instanceof JevError && /console\.typesafe\.ai/.test(e.hint));
-  process.env.TYPESAFE_API_KEY = saved;
+  const saved = { t: process.env.TYPESAFE_API_KEY, g: process.env.AI_GATEWAY_API_KEY };
+  const set = (t, g) => {
+    if (t) process.env.TYPESAFE_API_KEY = t; else delete process.env.TYPESAFE_API_KEY;
+    if (g) process.env.AI_GATEWAY_API_KEY = g; else delete process.env.AI_GATEWAY_API_KEY;
+  };
+
+  set('ts', null);
+  assert.deepEqual(backend(), { kind: 'typesafe', key: 'ts' });
+
+  set(null, 'vck_x');
+  assert.deepEqual(backend(), { kind: 'gateway', key: 'vck_x' }, '게이트웨이 키만 있어도 쓸 수 있어야 한다');
+
+  set('ts', 'vck_x');
+  assert.equal(backend().kind, 'typesafe', '둘 다 있으면 직접 호출');
+
+  set(null, null);
+  assert.throws(() => backend(), (e) => e instanceof JevError
+    && /console\.typesafe\.ai/.test(e.hint) && /ai-gateway/.test(e.hint));
+
+  set(saved.t, saved.g);
+}
+
+// --- 게이트웨이 응답 정규화 ---------------------------------------------
+// 게이트웨이는 boolean 타입을 쓰고 confidence 를 providerMetadata 로 분리해 보낸다.
+{
+  const r = simplify({
+    answers: {
+      urgent: { type: 'boolean', probability: 0.95 },
+      team: { type: 'choice', choice: 'billing', probabilities: { billing: 1, technical: 0 } },
+      sev: { type: 'score', score: 1.69, probabilities: { 0: 0, 1: 0.3, 2: 0.7 } },
+    },
+    providerMetadata: { typesafe: { confidence: { team: 1, sev: 0.54 } } },
+    usage: { inputTokens: 435, outputTokens: 40 },
+  }, { sev: { criteria: ['사소', '불편', '정지'] } });
+
+  assert.equal(r.answers.urgent.type, 'noul', 'boolean 은 noul 로 통일한다');
+  assert.equal(r.answers.urgent.probability, 0.95);
+  assert.equal(r.answers.urgent.yes, true);
+  assert.equal(r.answers.team.confidence, 1, 'providerMetadata 의 confidence 를 끌어온다');
+  assert.equal(r.answers.sev.confidence, 0.54);
+  assert.equal(r.answers.sev.level, '정지', 'legend 가 없으면 criteria 로 만든다');
+  assert.equal(r.usage.inputTokens, 435, 'inputTokens 표기도 읽는다');
+}
+
+// 확신도가 아예 없는 것과 낮은 것은 다르다. 없으면 경고하지 않는다.
+{
+  const r = simplify({ answers: { team: { type: 'choice', choice: 'a', probabilities: { a: 1 } } } });
+  assert.equal(r.answers.team.confidence, undefined, '없는 confidence 를 0 으로 떨구면 가짜 경고가 나간다');
 }
 
 // --- CLI (목 서버로 실제 HTTP 를 태운다) --------------------------------
-{
-  const mock = spawn(process.execPath, ['test/mock.mjs'], { stdio: ['ignore', 'ignore', 'pipe'] });
+for (const mode of ['typesafe', 'gateway']) {
+  const mock = spawn(process.execPath, ['test/mock.mjs'],
+    { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, JEV_MOCK: mode } });
   await new Promise((r) => mock.stderr.once('data', r));
-  const env = { ...process.env, TYPESAFE_API_KEY: 'test-key', JEV_ENDPOINT: 'http://localhost:7331' };
+  const env = {
+    ...process.env,
+    JEV_ENDPOINT: 'http://localhost:7331',
+    ...(mode === 'typesafe'
+      ? { TYPESAFE_API_KEY: 'test-key', AI_GATEWAY_API_KEY: '' }
+      : { TYPESAFE_API_KEY: '', AI_GATEWAY_API_KEY: 'test-key' }),
+  };
 
   const run = (args, input, script = SKILL) => new Promise((resolve) => {
     const p = spawn(process.execPath, [script, ...args], { env });
@@ -102,8 +154,8 @@ await assert.rejects(ask('x', {}), (e) => e instanceof JevError && /질문이 �
   });
 
   const one = await run(['티켓 본문', '--bool', 'urgent', '급한가?', '--quiet']);
-  assert.equal(one.code, 0);
-  assert.equal(one.o.trim(), 'true');
+  assert.equal(one.code, 0, `${mode}: ${one.e}`);
+  assert.equal(one.o.trim(), 'true', `${mode} 모드에서 bool 이 나와야 한다`);
 
   const multi = await run(['본문', '--bool', 'a', 'q1', '--pick', 'b', 'q2', 'x', 'y', '--json']);
   const j = JSON.parse(multi.o);
@@ -127,6 +179,7 @@ await assert.rejects(ask('x', {}), (e) => e instanceof JevError && /질문이 �
   assert.equal(viaLink.o.trim(), 'true', '.agents/skills 링크로 실행하면 CLI 가 돌아야 한다');
 
   mock.kill();
+  await new Promise((r) => mock.once('close', r));
 }
 
 console.log('ok');

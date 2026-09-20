@@ -20,6 +20,11 @@ skills/jev/jev.mjs       # CLI 겸 라이브러리. 파일 하나, 의존성 0�
 
 ## Rules
 
+- **백엔드가 둘이다.** `TYPESAFE_API_KEY` 는 api.typesafe.ai 로, `AI_GATEWAY_API_KEY` 는
+  Vercel AI Gateway 로 간다. 와이어 형식이 다르다 — 직접 호출은 `noul`, 게이트웨이는
+  `boolean` 이고, confidence 는 답변에 붙거나 `providerMetadata` 로 분리돼 온다.
+  `simplify()` 가 하나로 편다. 어느 쪽도 npm 의존성이 아니다.
+  `test/mock.mjs` 가 `JEV_MOCK` 으로 두 형식을 다 흉내내고, 테스트가 양쪽을 다 돈다.
 - **`skills/jev/jev.mjs` 는 자립형이어야 한다.** 스킬 디렉터리를 통째로 복사하면
   그대로 돌아야 한다. 외부 `import` 를 추가하지 말고, 의존성도 추가하지 않는다.
   `lib/` 를 다시 만들고 싶어지면, 그러면 복사 설치가 깨진다는 걸 먼저 떠올려라.

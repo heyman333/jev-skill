@@ -10,8 +10,58 @@
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const ENDPOINT = process.env.JEV_ENDPOINT ?? 'https://api.typesafe.ai/v1/systemone';
 const MODEL = process.env.JEV_MODEL ?? 'jev-latest';
+
+// 키 두 종류를 받는다.
+//
+//   TYPESAFE_API_KEY    TypeSafe 콘솔에서 발급. 직접 호출.
+//   AI_GATEWAY_API_KEY  Vercel AI Gateway 키(vck_). 게이트웨이 경유.
+//
+// npm 의존성은 어느 쪽도 없다 — 엔드포인트와 응답 모양만 다르다.
+// 둘 다 있으면 TypeSafe 직접 호출을 쓴다.
+export function backend() {
+  const direct = process.env.TYPESAFE_API_KEY?.trim();
+  const gateway = process.env.AI_GATEWAY_API_KEY?.trim();
+
+  if (direct) return { kind: 'typesafe', key: direct };
+  if (gateway) return { kind: 'gateway', key: gateway };
+
+  throw new JevError('API 키가 없습니다.', {
+    hint: 'TYPESAFE_API_KEY (https://console.typesafe.ai/keys) 또는\n  AI_GATEWAY_API_KEY (https://vercel.com/ai-gateway) 중 하나를 설정하세요.',
+  });
+}
+
+const ENDPOINTS = {
+  typesafe: 'https://api.typesafe.ai/v1/systemone',
+  gateway: 'https://ai-gateway.vercel.sh/v4/ai/evaluation-model',
+};
+
+/** 백엔드마다 질문 타입 이름이 다르다. 직접 호출은 noul, 게이트웨이는 boolean. */
+function toWire(questions, kind) {
+  if (kind === 'typesafe') return questions;
+  const out = {};
+  for (const [id, q] of Object.entries(questions)) {
+    out[id] = q.type === 'noul' ? { ...q, type: 'boolean' } : q;
+  }
+  return out;
+}
+
+function request(state, questions, { kind, key }) {
+  const url = process.env.JEV_ENDPOINT ?? ENDPOINTS[kind];
+  const body = kind === 'typesafe'
+    ? { state, model: MODEL, questions }
+    : { state, questions: toWire(questions, kind), providerOptions: {} };
+  const headers = {
+    authorization: `Bearer ${key}`,
+    'content-type': 'application/json',
+    ...(kind === 'gateway' && {
+      'ai-evaluation-model-specification-version': '4',
+      'ai-gateway-protocol-version': '0.0.1',
+      'ai-model-id': `typesafe-ai/${MODEL === 'jev-latest' ? 'jev' : MODEL}`,
+    }),
+  };
+  return { url, headers, body };
+}
 
 export class JevError extends Error {
   constructor(message, { status, hint } = {}) {
@@ -22,23 +72,14 @@ export class JevError extends Error {
   }
 }
 
-export function apiKey() {
-  const key = process.env.TYPESAFE_API_KEY?.trim();
-  if (!key) {
-    throw new JevError('TYPESAFE_API_KEY 가 설정되지 않았습니다.', {
-      hint: 'https://console.typesafe.ai/keys 에서 키를 발급한 뒤 `export TYPESAFE_API_KEY=...` 하세요.',
-    });
-  }
-  return key;
-}
-
 /**
  * 판단 하나를 요청한다. 질문 여러 개를 한 번에 보낼 수 있고, 그게 요점이다 —
  * 질문 6개를 묶어도 호출은 한 번, 비용도 한 번이다.
  */
 export async function ask(state, questions, { timeoutMs = 20000, signal } = {}) {
-  const key = apiKey();
+  const be = backend();
   if (!questions || !Object.keys(questions).length) throw new JevError('질문이 없습니다.');
+  const req = request(state, questions, be);
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -46,10 +87,10 @@ export async function ask(state, questions, { timeoutMs = 20000, signal } = {}) 
 
   let res;
   try {
-    res = await fetch(ENDPOINT, {
+    res = await fetch(req.url, {
       method: 'POST',
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ state, model: MODEL, questions }),
+      headers: req.headers,
+      body: JSON.stringify(req.body),
       signal: ac.signal,
     });
   } catch (e) {
@@ -60,7 +101,9 @@ export async function ask(state, questions, { timeoutMs = 20000, signal } = {}) 
   }
 
   const text = await res.text();
-  if (!res.ok) throw new JevError(errorMessage(res.status, text), { status: res.status, hint: errorHint(res.status) });
+  if (!res.ok) {
+    throw new JevError(errorMessage(res.status, text), { status: res.status, hint: errorHint(res.status, be.kind) });
+  }
 
   let body;
   try {
@@ -91,14 +134,28 @@ export async function askMany(states, questions, { concurrency = 8, onItem, ...o
   return out;
 }
 
-/** jev 응답을 쓰기 편한 모양으로 편다. 원본은 _raw 에 남긴다. */
+/**
+ * 양쪽 백엔드의 응답을 하나의 모양으로 편다. 원본은 _raw 에 남긴다.
+ *
+ * 다른 점:
+ *   예/아니오  직접 호출은 { type:'noul', noul }, 게이트웨이는 { type:'boolean', probability }
+ *   확신도      직접 호출은 답변에 붙어 오고, 게이트웨이는 providerMetadata.typesafe.confidence 로 분리돼 온다
+ *   legend      직접 호출만 준다. 없으면 질문의 criteria 로 만든다
+ */
 export function simplify(body, questions = {}) {
   const answers = {};
+  const sideConf = body.providerMetadata?.typesafe?.confidence ?? {};
+  const confOf = (id, a) => {
+    const v = a.confidence ?? sideConf[id];
+    return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  };
+
   for (const [id, a] of Object.entries(body.answers ?? {})) {
-    if (a.type === 'noul') {
-      answers[id] = { type: 'noul', probability: num(a.noul), yes: num(a.noul) >= 0.5 };
+    if (a.type === 'noul' || a.type === 'boolean') {
+      const p = num(a.type === 'noul' ? a.noul : a.probability);
+      answers[id] = { type: 'noul', probability: p, yes: p >= 0.5 };
     } else if (a.type === 'choice') {
-      answers[id] = { type: 'choice', value: a.choice, probabilities: a.probabilities ?? {}, confidence: num(a.confidence) };
+      answers[id] = { type: 'choice', value: a.choice, probabilities: a.probabilities ?? {}, confidence: confOf(id, a) };
     } else if (a.type === 'score') {
       const levels = questions[id]?.criteria ?? [];
       const idx = Math.round(num(a.score));
@@ -106,16 +163,19 @@ export function simplify(body, questions = {}) {
         type: 'score', value: num(a.score),
         level: a.legend?.[idx] ?? levels[idx] ?? null,
         max: Math.max(0, (Array.isArray(levels) ? levels.length : Object.keys(a.probabilities ?? {}).length) - 1),
-        probabilities: a.probabilities ?? {}, confidence: num(a.confidence),
+        probabilities: a.probabilities ?? {}, confidence: confOf(id, a),
       };
     } else {
       answers[id] = a;
     }
   }
-  const usage = body.usage ?? {};
+  const u = body.usage ?? {};
   return {
     answers,
-    usage: { inputTokens: num(usage.input_tokens), outputTokens: num(usage.output_tokens) },
+    usage: {
+      inputTokens: num(u.input_tokens ?? u.inputTokens),
+      outputTokens: num(u.output_tokens ?? u.outputTokens),
+    },
     _raw: body,
   };
 }
@@ -291,9 +351,12 @@ function errorMessage(status, text) {
   return `jev 가 ${status} 를 반환했습니다: ${detail}`;
 }
 
-function errorHint(status) {
-  if (status === 401 || status === 403)
-    return 'TYPESAFE_API_KEY 를 확인하세요. console.typesafe.ai/keys 에서 발급한 키여야 합니다 (Vercel AI Gateway 의 vck_ 키는 동작하지 않습니다).';
+function errorHint(status, kind) {
+  if (status === 401 || status === 403) {
+    return kind === 'gateway'
+      ? 'AI_GATEWAY_API_KEY 를 확인하세요. vercel.com/ai-gateway 에서 발급한 vck_ 키여야 합니다.'
+      : 'TYPESAFE_API_KEY 를 확인하세요. console.typesafe.ai/keys 에서 발급한 키여야 합니다.\n  Vercel AI Gateway 의 vck_ 키라면 AI_GATEWAY_API_KEY 로 넣으세요.';
+  }
   if (status === 429) return '요청이 한도를 넘었습니다. 잠시 후 다시 시도하세요.';
   return undefined;
 }
