@@ -195,7 +195,11 @@ for (const mode of ['typesafe', 'gateway']) {
     assert.ok(text.includes('TYPESAFE_API_KEY'), `${name} 에 TYPESAFE_API_KEY 안내가 없다`);
     assert.ok(text.includes('AI_GATEWAY_API_KEY'), `${name} 에 AI_GATEWAY_API_KEY 안내가 없다`);
     assert.match(text, /재시작|껐다 켜/, `${name} 에 에이전트 재시작 안내가 없다`);
-    assert.ok(text.includes('.zshrc'), `${name} 에 셸 설정 파일 안내가 없다`);
+    // .zshrc 는 대화형 셸만 읽는다. 에이전트는 비대화형 셸로 명령을 돌리므로
+    // .zshrc 에 넣으라고 안내하면 터미널에서는 되는데 에이전트만 실패한다.
+    // 실제로 그렇게 안내해 놓고 막혔다. 세 곳 모두 .zshenv 를 말해야 한다.
+    assert.ok(text.includes('.zshenv'), `${name} 이 .zshenv 를 안내하지 않는다`);
+    assert.match(text, /대화형/, `${name} 에 .zshrc 가 왜 안 되는지 설명이 없다`);
   }
 }
 

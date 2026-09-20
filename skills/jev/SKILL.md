@@ -131,23 +131,29 @@ team           billing  (71% · technical 14%, sales 14%)
 | `TYPESAFE_API_KEY` | https://console.typesafe.ai/keys |
 | `AI_GATEWAY_API_KEY` | https://vercel.com/ai-gateway (`vck_` 로 시작) |
 
-설정은 두 단계다. **둘째 단계를 빠뜨리는 경우가 많으니 함께 안내한다.**
+설정은 두 단계다. **둘 다 빠뜨리기 쉬우니 함께 안내한다.**
 
-1. 셸 설정 파일에 넣는다. macOS 기본은 zsh 라 `~/.zshrc`, bash 면 `~/.bashrc`.
+1. **`~/.zshenv`** 에 넣는다 (zsh 기준. bash 면 `~/.bashrc`).
 
    ```bash
-   echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshrc && source ~/.zshrc
+   echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshenv
    ```
 
-   터미널에 `export` 만 치면 그 창을 닫는 순간 사라진다. 파일에 넣어야 남는다.
+   **`~/.zshrc` 가 아니다.** `~/.zshrc` 는 대화형 셸만 읽는데,
+   에이전트는 명령을 비대화형 셸로 돌린다. `~/.zshenv` 는 모든 zsh 가 읽는다.
 
 2. **에이전트를 재시작한다.** 이미 떠 있는 프로세스는 나중에 바뀐 환경변수를
-   보지 못한다. 이 단계를 건너뛰면 키를 제대로 넣고도 계속 같은 오류가 난다.
+   보지 못한다. macOS 데스크톱 앱은 창을 닫아도 꺼지지 않으니 ⌘Q 로 완전히 종료한다.
 
-사용자가 "키 넣었는데 안 된다"고 하면 이 순서로 확인한다.
+### "키 넣었는데 안 된다"
 
-- `echo $AI_GATEWAY_API_KEY` 가 값을 찍는가 → 안 찍히면 1번을 다시
-- 터미널에서는 찍히는데 에이전트만 실패하는가 → 재시작했는지 확인,
-  그래도 안 되면 `~/.zprofile` 에도 같은 줄을 넣게 한다 (로그인 셸이 먼저 읽는다)
+이 순서로 짚는다. **2번이 가장 흔하다.**
 
-키 값을 사용자에게 채팅으로 붙여넣으라고 하지 않는다. 대화 기록에 남는다.
+1. 키가 어느 파일에 있는지 확인한다.
+   `grep -l AI_GATEWAY_API_KEY ~/.zshenv ~/.zshrc ~/.zprofile 2>/dev/null`
+2. `~/.zshrc` 에만 있으면 그게 원인이다. `~/.zshenv` 로 옮기게 한다.
+   터미널에서는 `echo $AI_GATEWAY_API_KEY` 가 값을 찍는데 에이전트만 실패하는 증상이 나온다.
+3. `~/.zshenv` 에 있는데도 안 되면 에이전트를 재시작했는지 확인한다.
+
+진단할 때 **키 값을 출력하지 않는다.** 어느 파일에 있는지만 본다.
+사용자에게 키를 채팅으로 붙여넣으라고 요구하지도 않는다 — 대화 기록에 남는다.

@@ -33,12 +33,14 @@ export function backend() {
       '    TYPESAFE_API_KEY      https://console.typesafe.ai/keys',
       '    AI_GATEWAY_API_KEY    https://vercel.com/ai-gateway  (vck_ 로 시작)',
       '',
-      '창을 닫아도 남게 하려면 셸 설정 파일에 넣습니다.',
+      '셸 설정 파일에 넣습니다. ~/.zshrc 가 아니라 ~/.zshenv 입니다 —',
+      '~/.zshrc 는 대화형 셸만 읽고, 에이전트는 비대화형 셸로 명령을 돌립니다.',
       '',
-      "    echo 'export AI_GATEWAY_API_KEY=\"...\"' >> ~/.zshrc && source ~/.zshrc",
+      "    echo 'export AI_GATEWAY_API_KEY=\"...\"' >> ~/.zshenv",
       '',
-      '이미 실행 중인 에이전트는 나중에 바뀐 환경변수를 보지 못합니다.',
-      '키를 넣었다면 에이전트를 껐다 켜세요.',
+      '그다음 에이전트를 재시작하세요. 이미 실행 중인 프로세스는 나중에 바뀐',
+      '환경변수를 보지 못합니다. macOS 데스크톱 앱은 창을 닫아도 꺼지지 않으니',
+      '⌘Q 로 완전히 종료해야 합니다.',
     ].join('\n  '),
   });
 }

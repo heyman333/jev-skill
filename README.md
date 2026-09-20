@@ -77,28 +77,40 @@ jev는 이식 가능한 [Agent Plugin](https://agent-plugins.org) 으로 배포�
 
 #### 셸 설정 파일에 넣는다
 
-macOS 기본은 zsh 라 `~/.zshrc`, bash 를 쓰면 `~/.bashrc` 다.
-`echo $SHELL` 로 확인할 수 있다.
+**`~/.zshrc` 가 아니라 `~/.zshenv` 다.** 여기서 대부분 막힌다.
 
 ```bash
-echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshrc && source ~/.zshrc
+echo 'export AI_GATEWAY_API_KEY="vck_..."' >> ~/.zshenv
 ```
+
+zsh 는 파일마다 읽는 조건이 다르다.
+
+| 파일 | 언제 읽히나 |
+|---|---|
+| `~/.zshrc` | **대화형 셸만** — 사람이 직접 치는 터미널 |
+| `~/.zprofile` | 로그인 셸만 |
+| **`~/.zshenv`** | **모든 zsh** — 에이전트가 명령을 돌리는 비대화형 셸 포함 |
+
+에이전트는 명령을 **비대화형** 셸로 돌린다. `~/.zshrc` 에 넣으면 터미널에서는
+`echo $AI_GATEWAY_API_KEY` 가 값을 찍는데 에이전트는 계속 `API 키가 없습니다` 를 본다.
+
+bash 를 쓴다면 `~/.bashrc` 에 넣되, 같은 증상이 나오면 `~/.profile` 에도 넣는다.
+`echo $SHELL` 로 어느 쪽인지 확인할 수 있다.
 
 키가 셸 히스토리에 남는 게 싫으면 에디터로 직접 연다.
 
 ```bash
-open -e ~/.zshrc      # macOS
+open -e ~/.zshenv      # macOS
 ```
 
 #### 에이전트를 재시작한다
 
-**이게 제일 자주 걸리는 지점이다.** 이미 실행 중인 Claude Code / Codex 는
-나중에 바뀐 환경변수를 보지 못한다. 키를 넣었으면 에이전트를 껐다 켜야 한다.
+이미 실행 중인 Claude Code / Codex 는 나중에 바뀐 환경변수를 보지 못한다.
+macOS 데스크톱 앱은 창을 닫는 것만으로 꺼지지 않는다 — **⌘Q** 로 완전히 종료한 뒤 다시 연다.
 
-확인:
+#### 확인
 
 ```bash
-echo $AI_GATEWAY_API_KEY          # 값이 찍히는지
 node ~/.claude/skills/jev/jev.mjs "결제가 3일째 안 돼요. 급해요." \
   --bool urgent "시간에 쫓기는 요청인가?"
 ```
@@ -108,9 +120,7 @@ urgent         예  (96%)
                412ms · 입력 118 토큰
 ```
 
-터미널에서는 보이는데 에이전트에서만 `API 키가 없습니다` 가 나오면,
-그 에이전트가 로그인 셸을 거치지 않은 것이다. `~/.zprofile` 에도 같은 줄을 넣어본다 —
-로그인 셸은 그쪽을 먼저 읽는다.
+에이전트 안에서 확인하려면 그냥 물어보면 된다 — "jev 키 잡혔는지 확인해줘".
 
 > 키를 저장소에 커밋하지 마라. `.env` 는 이미 `.gitignore` 에 들어 있지만,
 > 셸 설정 파일에 두는 쪽이 더 안전하다.
