@@ -1,0 +1,13 @@
+{
+  "name": "jev-skill",
+  "description": "Marketplace for the jev judgment-delegation skill",
+  "owner": { "name": "heyman333", "url": "https://github.com/heyman333" },
+  "plugins": [
+    {
+      "name": "jev",
+      "source": "./",
+      "description": "좁은 판단(예/아니오·분류·0~N 점수)을 LLM 대신 jev 에게 넘겨 에이전트의 토큰과 시간을 아끼는 스킬. 타입이 고정된 확률과 캘리브레이션된 확신도를 건당 약 $0.00004, 300~500ms 에 돌려준다.",
+      "version": "0.1.0"
+    }
+  ]
+}
